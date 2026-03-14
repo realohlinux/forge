@@ -36,13 +36,11 @@ proc install() =
     client.downloadFile(URL, pkgsrc)
     echo fmt"Successfully downloaded {PKG} from {REPO}"
     
-
     echo SEPARATOR
 
     echo "Extracting source.\n"
  
-    let extract = execProcess(fmt"tar -xzvf {pkgsrc} -C {TMP}/{PKG}")
-    echo extract
+    discard execCmd(fmt"tar -xzvf {pkgsrc} -C {TMP}/{PKG}")
     echo "Source extracted."  
 
     echo SEPARATOR
@@ -55,16 +53,12 @@ proc install() =
 
     echo SEPARATOR
 
-    let build = execProcess(fmt"cd {TMP}/{PKG} && sh build.sh")
-    echo build
+    discard execCmd(fmt"cd {TMP}/{PKG} && sh build.sh")
 
     echo SEPARATOR
     echo "Done, registering into the world set."
     writeFile(fmt"/var/forge/world/{PKG}", "")
     echo fmt"{PKG} has been installed successfully."
     
-
-
 if OP == "install":
     install()
-
