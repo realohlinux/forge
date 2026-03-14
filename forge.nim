@@ -54,7 +54,7 @@ proc install() =
                 echo fmt"Dependency {i} is already installed, skipping."
                 continue
             echo fmt"Installing dependency: {i}"
-            sleep(1)
+            sleep(1000)
             if execCmd(fmt"forge install {i}") != 0:
                 echo fmt"Error: Failed to install dependency {i}."
                 quit(1)
