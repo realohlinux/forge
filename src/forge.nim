@@ -18,8 +18,8 @@ elif paramCount() == 1:
 
 let PARAMS = commandLineParams()
 let REPO = readFile("/var/hypernova/repo").strip()
-let OP = PARAMS[1]
-let PKGS = PARAMS[2..^1]
+let OP = PARAMS[0]
+let PKGS = PARAMS[1..^1]
 
 createDir("/var/forge/world")
 
