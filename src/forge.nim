@@ -1,5 +1,9 @@
 import os, osproc, strformat, httpclient, strutils, posix
 
+const
+  TMP = "/tmp/hypernova"
+  SEPARATOR = "----------------------------------------"
+
 if paramCount() == 0:
     echo """Usage: forge <operation> <package>
     Operations:
@@ -15,36 +19,33 @@ elif paramCount() > 2:
     echo "Error: Too many arguments"
     quit(1)
 
+let PARAMS = commandLineParams()
 let REPO = readFile("/var/hypernova/repo").strip()
-let TMP = "/tmp/hypernova"
-let OP = paramStr(1)
-let PKG = paramStr(2)
-let URL = fmt"{REPO}/{PKG}.tar.gz"
-let SEPARATOR= "----------------------------------------"
+let OP = PARAMS[1]
+let PKGS = PARAMS[2..^1]
 
 createDir("/var/forge/world")
-createDir(fmt"{TMP}/{PKG}")
 
-proc install() =
+proc install(name: string) =
     echo "Downloading source."
     echo fmt"Connecting to {REPO}..."
 
-    let workdir = TMP / PKG
+    let workdir = TMP / name
     createDir(workdir)
-    let pkgsrc = workdir / (PKG & ".tar.gz")
+    let pkgsrc = workdir / (name & ".tar.gz")
     let client = newHttpClient()
-    client.downloadFile(URL, pkgsrc)
-    echo fmt"Successfully downloaded {PKG} from {REPO}"
+    client.downloadFile(fmt"{REPO}/{name}.tar.gz", pkgsrc)
+    echo fmt"Successfully downloaded {name} from {REPO}"
 
     echo SEPARATOR
 
     echo "Extracting source.\n"
 
-    discard execCmd(fmt"tar -xzvf {pkgsrc} -C {TMP}/{PKG}")
+    discard execCmd(fmt"tar -xzvf {pkgsrc} -C {TMP}/{name}")
     echo "Source extracted."
 
-    if fileExists(fmt"{TMP}/{PKG}/depends"):
-        for dep in readFile(fmt"{TMP}/{PKG}/depends").splitLines():
+    if fileExists(fmt"{TMP}/{name}/depends"):
+        for dep in readFile(fmt"{TMP}/{name}/depends").splitLines():
             let i = dep.strip()
 
             if i.len == 0:
@@ -55,9 +56,11 @@ proc install() =
                 continue
             echo fmt"Installing dependency: {i}"
             sleep(1000)
-            if execCmd(fmt"forge install {i}") != 0:
-                echo fmt"Error: Failed to install dependency {i}."
-                quit(1)
+            try:
+              install(dep)
+            except Exception as e:
+              stderr.writeLine(fmt"Error: Failed to install dependency {i}: {e.msg}")
+              quit(1)
     else:
         echo "No dependencies found."
 
@@ -66,35 +69,37 @@ proc install() =
     echo "Building package."
     echo SEPARATOR
 
-    let buildsh = readFile(fmt"{TMP}/{PKG}/build.sh")
+    let buildsh = readFile(fmt"{TMP}/{name}/build.sh")
     echo buildsh
 
     echo SEPARATOR
 
-    if execCmd(fmt"cd {TMP}/{PKG} && sh build.sh") != 0:
+    if execCmd(fmt"cd {TMP}/{name} && sh build.sh") != 0:
         echo "Error: Build failed."
         quit(1)
 
     echo SEPARATOR
     echo "Done, registering into the world set."
-    writeFile(fmt"/var/forge/world/{PKG}", "")
-    echo fmt"{PKG} has been installed successfully."
+    writeFile(fmt"/var/forge/world/{name}", "")
+    echo fmt"{name} has been installed successfully."
 
-proc remove() =
-    let tbr = readFile(fmt"/var/forge/world/{PKG}_installed").splitLines()
+proc remove(name: string) =
+    let tbr = readFile(fmt"/var/forge/world/{name}_installed").splitLines()
     for item in tbr:
         if dirExists(item):
           removeDir(item)
         elif fileExists(item):
           removeFile(item)
     echo "Deregestering from world set."
-    removeFile(fmt"/var/forge/world/{PKG}_installed")
-    removeFile(fmt"/var/forge/world/{PKG}")
+    removeFile(fmt"/var/forge/world/{name}_installed")
+    removeFile(fmt"/var/forge/world/{name}")
 
 
 if OP == "install":
-    install()
+  for pkg in PKGS:
+    install(pkg)
 elif OP == "remove":
-    remove()
+  for pkg in PKGS:
+    remove(pkg)
 else:
     echo fmt"Error: Unknown operation '{OP}'"
