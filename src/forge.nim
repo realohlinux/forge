@@ -6,27 +6,33 @@ if getuid() != 0:
   quit(1)
 const
   TMP = "/tmp/hypernova"
+  WORLD_DIR = "/var/forge/world"
   SEPARATOR = "----------------------------------------"
   VALID_PKG_PATTERN = re"^[a-zA-Z0-9][a-zA0-9._-]*$"
 
-if paramCount() == 0:
+proc printUsage() =
     echo """Usage: forge <operation> <package>
     Operations:
         install - Install a package
         remove - Remove a package
     """
-    quit(1)
 
-elif paramCount() == 1:
-    echo "Error: Missing package name"
-    quit(1)
+if paramCount() == 0:
+  printUsage()
+  quit(1)
+
 
 let PARAMS = commandLineParams()
-let REPO = readFile("/var/hypernova/repo").strip()
 let OP = PARAMS[0]
-let PKGS = PARAMS[1..^1]
 
-createDir("/var/forge/world")
+if OP notin ["install", "remove", "list", "info"]:
+  echo fmt"Error: Unknown operation '{OP}'"
+  printUsage()
+  quit(1)
+
+let PKGS = if paramCount() > 1: PARAMS[1..^1] else: @[]
+let REPO = readFile("/var/hypernova/repo").strip()
+createDir(WORLD_DIR)
 
 proc validatePkgName(name: string): bool =
     ## Reject anything that could be used for path traversal or injection.
