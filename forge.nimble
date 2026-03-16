@@ -6,6 +6,7 @@ srcDir        = "src"
 bin           = @["forge"]
 
 requires "nim >= 2.0.8"
+requires "zippy >= 0.10.19"
 
 import std/strformat
 

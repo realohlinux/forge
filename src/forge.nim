@@ -1,12 +1,11 @@
-import os, osproc, strformat, httpclient, strutils, posix, re, times
-stdout.flushFile()
+import std/[os, osproc, strformat, httpclient, strutils, posix]
+import zippy/tarballs
 
 if getuid() != 0:
   stderr.writeLine("You need to be a superuser to run the forge package manager.")
   quit(1)
 const
-  TMP = "/tmp/hypernova"
-  WORLD_DIR = "/var/forge/world"
+  TMP = "/tmp/forge"
   SEPARATOR = "----------------------------------------"
 
 let VALID_PKG_PATTERN = re"^[a-zA-Z0-9][a-zA0-9._-]*$"
@@ -24,6 +23,7 @@ if paramCount() == 0:
 
 
 let PARAMS = commandLineParams()
+let REPO = readFile("/var/forge/repo").strip()
 let OP = PARAMS[0]
 
 if OP notin ["install", "remove", "list", "info"]:
@@ -78,11 +78,11 @@ proc install(name: string) =
 
     echo "Extracting source.\n"
 
-    discard execCmd(fmt"tar -xzvf {pkgsrc} -C {TMP}/{name}")
+    extractAll(pkgsrc, workdir)
     echo "Source extracted."
 
     if fileExists(fmt"{TMP}/{name}/depends"):
-        for dep in readFile(fmt"{TMP}/{name}/depends").splitLines():
+        for dep in lines(fmt"{TMP}/{name}/depends"):
             let i = dep.strip()
 
             if i.len == 0:
