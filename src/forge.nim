@@ -1,8 +1,36 @@
 import std/[os, osproc, strformat, httpclient, strutils, posix, re, times]
 import zippy/tarballs
 
+const
+  Reset = "\e[0m"
+  Bold = "\e[1m"
+  Red = "\e[31m"
+  Green = "\e[32m"
+  Yellow = "\e[33m"
+  Blue = "\e[34m"
+  Cyan = "\e[36m"
+  Dim = "\e[2m"
+
+proc error(msg: string) =
+  stderr.writeLine(fmt"{Bold}{Red}Error:{Reset} {msg}")
+
+proc success(msg: string) =
+  echo fmt"{Bold}{Green}✓{Reset} {msg}"
+
+proc info(msg: string) =
+  echo fmt"{Bold}{Blue}::{Reset} {msg}"
+
+proc status(msg: string) =
+  echo fmt"{Bold}{Cyan}>{Reset} {msg}"
+
+proc warn(msg: string) =
+  echo fmt"{Bold}{Yellow}Warning:{Reset} {msg}"
+
+proc dimLine(msg: string) =
+  echo fmt"{Dim}{msg}{Reset}"
+
 if getuid() != 0:
-  stderr.writeLine("You need to be a superuser to run the forge package manager.")
+  error("You need to be a superuser to run the forge package manager.")
   quit(1)
 const
   TMP = "/tmp/forge"
@@ -28,7 +56,7 @@ let REPO = readFile("/var/forge/repo").strip()
 let OP = PARAMS[0]
 
 if OP notin ["install", "remove", "list", "info"]:
-  echo fmt"Error: Unknown operation '{OP}'"
+  error(fmt"Unknown operation '{OP}'")
   printUsage()
   quit(1)
 
@@ -51,11 +79,11 @@ proc acquireLock() =
   if fileExists(lockPath):
     let age = getTime() - getLastModificationTime(lockPath)
     if age.inHours < 1:
-      stderr.writeLine("Error: Another forge process is running (lockfile exists).")
-      stderr.writeLine("If this is stale, remove " & lockPath)
+      error("Another forge process is running (lockfile exists).")
+      warn("If this is stale, remove " & lockPath)
       quit(1)
     else:
-      echo "Removing stale lockfile."
+      warn("Removing stale lockfile.")
       removeFile(lockPath)
   writeFile(lockPath, $getCurrentProcessId())
 
@@ -64,22 +92,22 @@ proc releaseLock() =
     removeFile(lockPath)
 
 proc install(name: string) =
-    echo "Downloading source."
-    echo fmt"Connecting to {REPO}..."
+    info(fmt"Downloading source for {Bold}{name}{Reset}")
+    status(fmt"Connecting to {REPO}...")
 
     let workdir = TMP / name
     createDir(workdir)
     let pkgsrc = workdir / (name & ".tar.gz")
     let client = newHttpClient()
     client.downloadFile(fmt"{REPO}/{name}.tar.gz", pkgsrc)
-    echo fmt"Successfully downloaded {name} from {REPO}"
+    success(fmt"Downloaded {name} from {REPO}")
 
-    echo SEPARATOR
+    dimLine(SEPARATOR)
 
-    echo "Extracting source.\n"
+    info("Extracting source.\n")
 
     extractAll(pkgsrc, workdir)
-    echo "Source extracted."
+    success("Source extracted.")
 
     if fileExists(fmt"{TMP}/{name}/depends"):
         for dep in lines(fmt"{TMP}/{name}/depends"):
@@ -89,22 +117,22 @@ proc install(name: string) =
                 continue
 
             if fileExists(fmt"/var/forge/world/{i}"):
-                echo fmt"Dependency {i} is already installed, skipping."
+                warn(fmt"Dependency {i} is already installed, skipping.")
                 continue
-            echo fmt"Installing dependency: {i}"
+            info(fmt"Installing dependency: {Bold}{i}{Reset}")
             sleep(1000)
             try:
-              install(dep)
+              install(i)
             except Exception as e:
-              stderr.writeLine(fmt"Error: Failed to install dependency {i}: {e.msg}")
+              error(fmt"Failed to install dependency {i}: {e.msg}")
               quit(1)
     else:
-        echo "No dependencies found."
+      status("No dependencies found.")
 
-    echo SEPARATOR
+    dimLine(SEPARATOR)
 
-    echo "Building package."
-    echo SEPARATOR
+    info("Building package.")
+    dimLine(SEPARATOR)
 
     let timeMarker = TMP / (name & "_marker")
     sleep(1000)
@@ -113,19 +141,20 @@ proc install(name: string) =
     let buildsh = readFile(fmt"{TMP}/{name}/build.sh")
     echo buildsh
 
-    echo SEPARATOR
+    dimLine(SEPARATOR)
 
     if execCmd(fmt"cd {TMP}/{name} && sh build.sh") != 0:
-        echo "Error: Build failed."
+        error("Build failed.")
         quit(1)
 
     let dirs = "/bin /sbin /usr/bin /usr/sbin /usr/include /usr/share /usr/lib /usr/lib64 /usr/local/bin /usr/local/lib /etc /lib /lib64"
     let installLog = fmt"/var/forge/world/{name}_installed"
-    echo "Tracking installed files..."
+    status("Tracking installed files...")
     discard execCmd(fmt"find {dirs} -newer {timeMarker} ! -type d 2>/dev/null > {installLog}")
     writeFile(fmt"/var/forge/world/{name}", "")
     removeFile(timeMarker)
-    echo fmt"{name} has been installed succesfully."
+    success(fmt"{name} has been installed succesfully.")
+
 proc remove(name: string) =
     let tbr = readFile(fmt"/var/forge/world/{name}_installed").splitLines()
     for item in tbr:
@@ -134,9 +163,10 @@ proc remove(name: string) =
         if fileExists(path) or symlinkExists(path): # changed that cuz remove script literally removed my /usr/bin
           removeFile(path)
           echo "Removed: ", path
-    echo "Deregestering from world set."
+    info("Deregestering from world set.")
     removeFile(fmt"/var/forge/world/{name}_installed")
     removeFile(fmt"/var/forge/world/{name}")
+    success(fmt"{name} has been removed.")
 
 case OP
 of "install":
@@ -154,6 +184,6 @@ of "remove":
   finally:
       releaseLock()
 else:
-  echo fmt"Error: Unknown operation '{OP}'"
+  error(fmt"Unknown operation '{OP}'")
   printUsage()
   quit(1)
