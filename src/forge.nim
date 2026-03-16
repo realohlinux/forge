@@ -1,28 +1,66 @@
 import std/[os, osproc, strformat, httpclient, strutils, posix]
 import zippy/tarballs
 
+if getuid() != 0:
+  stderr.writeLine("You need to be a superuser to run the forge package manager.")
+  quit(1)
 const
   TMP = "/tmp/forge"
   SEPARATOR = "----------------------------------------"
+  VALID_PKG_PATTERN = re"^[a-zA-Z0-9][a-zA0-9._-]*$"
 
-if paramCount() == 0:
+proc printUsage() =
     echo """Usage: forge <operation> <package>
     Operations:
         install - Install a package
         remove - Remove a package
     """
-    quit(1)
 
-elif paramCount() == 1:
-    echo "Error: Missing package name"
-    quit(1)
+if paramCount() == 0:
+  printUsage()
+  quit(1)
+
 
 let PARAMS = commandLineParams()
 let REPO = readFile("/var/forge/repo").strip()
 let OP = PARAMS[0]
-let PKGS = PARAMS[1..^1]
 
-createDir("/var/forge/world")
+if OP notin ["install", "remove", "list", "info"]:
+  echo fmt"Error: Unknown operation '{OP}'"
+  printUsage()
+  quit(1)
+
+let PKGS = if paramCount() > 1: PARAMS[1..^1] else: @[]
+let REPO = readFile("/var/hypernova/repo").strip()
+createDir(WORLD_DIR)
+
+proc validatePkgName(name: string): bool =
+    ## Reject anything that could be used for path traversal or injection.
+    if name.len == 0 or name.len > 128:
+      return false
+    if ".." in name or "/" in name or "\\" in name:
+      return false
+
+    return name.match(VALID_PKG_PATTERN)
+
+let lockPath = TMP / "forge.lock"
+
+proc acquireLock() =
+  createDir(TMP)
+  if fileExists(lockPath):
+    let age = getTime() - getLastModificationTime(lockPath)
+    if age.inHours < 1:
+      stderr.writeLine("Error: Another forge process is running (lockfile exists).")
+      stderr.writeLine("If this is stale, remove ", & lockPath)
+      quit(1)
+    else:
+      echo "Removing stale lockfile."
+      removeFile(lockPath)
+  writeFile(lockPath, $getCurrentProcessId())
+
+proc releaseLock() =
+  if fileExists(lockPath):
+    removeFile(lockPath)
 
 proc install(name: string) =
     echo "Downloading source."
@@ -67,6 +105,10 @@ proc install(name: string) =
     echo "Building package."
     echo SEPARATOR
 
+    let timeMarker = TMP / (name & "_marker")
+    sleep(1000)
+    discard execCmd("touch " & timeMarker)
+    sleep(1000)
     let buildsh = readFile(fmt"{TMP}/{name}/build.sh")
     echo buildsh
 
@@ -75,28 +117,42 @@ proc install(name: string) =
     if execCmd(fmt"cd {TMP}/{name} && sh build.sh") != 0:
         echo "Error: Build failed."
         quit(1)
-
-    echo SEPARATOR
-    echo "Done, registering into the world set."
+    
+    let dirs = "/bin /sbin /usr/bin /usr/sbin /usr/include /usr/share /usr/lib /usr/lib64 /usr/local/bin /usr/local/lib /etc /lib /lib64"
+    let installLog = fmt"/var/forge/world/{name}_installed"
+    echo "Tracking installed files..."
+    discard execCmd(fmt"find {dirs} -newer {timeMarker} ! -type d 2>/dev/null > {installLog}")
     writeFile(fmt"/var/forge/world/{name}", "")
-    echo fmt"{name} has been installed successfully."
-
+    removeFile(timeMarker)
+    echo fmt"{name} has been installed succesfully."
 proc remove(name: string) =
-    for item in lines(fmt"/var/forge/world/{name}_installed"):
-        if dirExists(item):
-          removeDir(item)
-        elif fileExists(item):
-          removeFile(item)
+    let tbr = readFile(fmt"/var/forge/world/{name}_installed").splitLines()
+    for item in tbr:
+        let path = item.strip()
+        if path.len == 0: continue
+        if fileExists(path) or symlinkExists(path): # changed that cuz remove script literally removed my /usr/bin
+          removeFile(path)
+          echo "Removed: ", path
     echo "Deregestering from world set."
     removeFile(fmt"/var/forge/world/{name}_installed")
     removeFile(fmt"/var/forge/world/{name}")
 
-
-if OP == "install":
-  for pkg in PKGS:
-    install(pkg)
-elif OP == "remove":
-  for pkg in PKGS:
-    remove(pkg)
+case OP
+of "install":
+  acquireLock()
+  try:
+    for pkg in PKGS:
+      install(pkg)
+  finally:
+    releaseLock()
+of "remove":
+  acquireLock()
+  try:
+    for pkg in PKGS:
+      remove(pkg)
+  finally:
+      releaseLock()
 else:
-    echo fmt"Error: Unknown operation '{OP}'"
+  echo fmt"Error: Unknown operation '{OP}'"
+  printUsage()
+  quit(1)
