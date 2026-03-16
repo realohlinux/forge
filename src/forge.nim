@@ -70,9 +70,10 @@ proc install(name: string) =
     echo "Building package."
     echo SEPARATOR
 
-    let timeMarker = fmt"{TMP}/{name}_marker"
-    writeFile(timeMarker, "")
-
+    let timeMarker = TMP / (name & "_marker")
+    sleep(1000)
+    discard execCmd("touch " & timeMarker)
+    sleep(1000)
     let buildsh = readFile(fmt"{TMP}/{name}/build.sh")
     echo buildsh
 
@@ -81,19 +82,22 @@ proc install(name: string) =
     if execCmd(fmt"cd {TMP}/{name} && sh build.sh") != 0:
         echo "Error: Build failed."
         quit(1)
-
-    echo SEPARATOR
-    echo "Done, registering into the world set."
+    
+    let dirs = "/bin /sbin /usr/bin /usr/sbin /usr/include /usr/share /usr/lib /usr/lib64 /usr/local/bin /usr/local/lib /etc /lib /lib64"
+    let installLog = fmt"/var/forge/world/{name}_installed"
+    echo "Tracking installed files..."
+    discard execCmd(fmt"find {dirs} -newer {timeMarker} ! -type d 2>/dev/null > {installLog}")
     writeFile(fmt"/var/forge/world/{name}", "")
-    echo fmt"{name} has been installed successfully."
-
+    removeFile(timeMarker)
+    echo fmt"{name} has been installed succesfully."
 proc remove(name: string) =
     let tbr = readFile(fmt"/var/forge/world/{name}_installed").splitLines()
     for item in tbr:
-        if dirExists(item):
-          removeDir(item)
-        elif fileExists(item):
-          removeFile(item)
+        let path = item.strip()
+        if path.len == 0: continue
+        if fileExists(path) or symlinkExists(path): # changed that cuz remove script literally removed my /usr/bin
+          removeFile(path)
+          echo "Removed: ", path
     echo "Deregestering from world set."
     removeFile(fmt"/var/forge/world/{name}_installed")
     removeFile(fmt"/var/forge/world/{name}")
