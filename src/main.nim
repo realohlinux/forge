@@ -113,6 +113,7 @@ proc install(name: string) =
     writeFile(fmt"/var/forge/world/{name}", "")
     removeFile(timeMarker)
     consoleOkay(fmt"{name} has been installed succesfully.")
+    removeDir(workDir)
 
 proc list() =
     var count = 0
