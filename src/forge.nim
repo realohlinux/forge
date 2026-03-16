@@ -96,6 +96,7 @@ proc install(name: string) =
     status(fmt"Connecting to {REPO}...")
 
     let workdir = TMP / name
+    createDir(workdir)
     let pkgsrc = TMP / (name & ".tar.gz")
     let client = newHttpClient()
     client.downloadFile(fmt"{REPO}/{name}.tar.gz", pkgsrc)
@@ -104,8 +105,12 @@ proc install(name: string) =
     dimLine(SEPARATOR)
 
     info("Extracting source.\n")
+    
+    if dirExists(workdir):
+        removeDir(workdir)
 
-    extractAll(workdir, pkgsrc)
+    extractAll(pkgsrc, workdir)
+    removeFile(pkgsrc)
     success("Source extracted.")
 
     if fileExists(fmt"{TMP}/{name}/depends"):
