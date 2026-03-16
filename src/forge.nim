@@ -8,7 +8,8 @@ const
   TMP = "/tmp/hypernova"
   WORLD_DIR = "/var/forge/world"
   SEPARATOR = "----------------------------------------"
-  VALID_PKG_PATTERN = re"^[a-zA-Z0-9][a-zA0-9._-]*$"
+
+let VALID_PKG_PATTERN = re"^[a-zA-Z0-9][a-zA0-9._-]*$"
 
 proc printUsage() =
     echo """Usage: forge <operation> <package>
@@ -51,7 +52,7 @@ proc acquireLock() =
     let age = getTime() - getLastModificationTime(lockPath)
     if age.inHours < 1:
       stderr.writeLine("Error: Another forge process is running (lockfile exists).")
-      stderr.writeLine("If this is stale, remove ", & lockPath)
+      stderr.writeLine("If this is stale, remove " & lockPath)
       quit(1)
     else:
       echo "Removing stale lockfile."
@@ -117,7 +118,7 @@ proc install(name: string) =
     if execCmd(fmt"cd {TMP}/{name} && sh build.sh") != 0:
         echo "Error: Build failed."
         quit(1)
-    
+
     let dirs = "/bin /sbin /usr/bin /usr/sbin /usr/include /usr/share /usr/lib /usr/lib64 /usr/local/bin /usr/local/lib /etc /lib /lib64"
     let installLog = fmt"/var/forge/world/{name}_installed"
     echo "Tracking installed files..."
