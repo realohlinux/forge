@@ -76,7 +76,7 @@ proc install(name: string) =
     let workdir = TEMP_DIR / name
     let pkgsrc = fmt"{TEMP_DIR}/{name}.tar.gz"
     let client = newHttpClient()
-    client.downloadFile(fmt"{REPO_DIR}/{name}.tar.gz", pkgsrc)
+    client.downloadFile(fmt"{REPO_DATA}/{name}.tar.gz", pkgsrc)
     consoleOkay(fmt"Downloaded {name} from {REPO_DIR}")
 
     consoleDimSep()
