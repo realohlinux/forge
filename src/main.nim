@@ -21,7 +21,7 @@ const
 let PKG_RE = re("^[a-zA-Z0-9][a-zA0-9._-]*$")
 
 
-if not checkCanExecute():
+if checkCanExecute():
     printUsage()
     programExit("Cannot execute forge")
 
