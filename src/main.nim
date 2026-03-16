@@ -21,7 +21,7 @@ const
 let PKG_RE = re("^[a-zA-Z0-9][a-zA0-9._-]*$")
 
 
-if not checkCanExecute(): 
+if not checkCanExecute():
   programExit("Cannot execute: insufficient permissions or no operation specified.")
 
 let
@@ -114,6 +114,21 @@ proc install(name: string) =
     removeFile(timeMarker)
     consoleOkay(fmt"{name} has been installed succesfully.")
 
+proc list() =
+    var count = 0
+    for kind, path in walkDir(WORLD_DIR):
+        if kind == pcFile:
+            let name = extractFilename(path)
+            if not name.endsWith("_installed"):
+                echo name
+                inc count
+    if count == 0:
+        consoleInfo("No packages installed.")
+    else:
+      consoleInfo(fmt"{count} package(s) installed.")
+
+
+
 proc remove(name: string) =
     let tbr = readFile(fmt"/var/forge/world/{name}_installed").splitLines()
     for item in tbr:
@@ -136,6 +151,8 @@ of "remove":
   withLock(LOCK_PATH):
     for pkg in PKGS:
       remove(pkg)
+of "list":
+  list()
 else:
     programExit("Operation not supported: {OPERATION}")
     printUsage()
