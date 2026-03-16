@@ -25,14 +25,10 @@ proc programExit*[T](msg: T = "", code: int = QuitFailure) =
 
 
 proc checkCanExecute*(): bool =
-     if getuid() != 0: 
-        echo "Must be root."
-        return false
-     if paramCount() == 0: 
-        echo "No operation specified."
-        return false
-     else:
-        return true
+     if getuid() != 0: return false
+     if paramCount() == 0: return false    
+
+     return true         
 
 
 template printUsage*() =

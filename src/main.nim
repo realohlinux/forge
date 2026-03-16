@@ -21,8 +21,8 @@ const
 let PKG_RE = re("^[a-zA-Z0-9][a-zA0-9._-]*$")
 
 
-if checkCanExecute() == false:
-    programExit("Cannot execute: insufficient permissions or no operation specified.")
+if not checkCanExecute(): 
+  programExit("Cannot execute: insufficient permissions or no operation specified.")
 
 let
     CMDLINE     = commandLineParams()
