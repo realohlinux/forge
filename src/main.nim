@@ -39,18 +39,6 @@ let PKGS = if paramCount() > 1: CMDLINE[1..^1] else: @[]
 
 createDir(WORLD_DIR)
 
-proc validatePkgName(name: string): bool =
-    ## Reject anything that could be used for path traversal or injection.
-    if name.len == 0 or name.len > 128:
-      return false
-    if ".." in name or "/" in name or "\\" in name:
-      return false
-
-    return name.match(PKG_RE)
-
-let lockPath = TEMP_DIR / "forge.lock"
-
-
 
 proc install(name: string) =
     consoleInfo(fmt"Downloading source for {name}")

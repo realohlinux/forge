@@ -3,8 +3,10 @@
 import std/[os, times]
 import "console", "handler"
 
+
 when not defined(debug):
     {.push optimization:speed, checks:off, warnings:off.}
+
 
 proc acquireLock(lockPath: string) =
   createDir(parentDir(lockPath))
