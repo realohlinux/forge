@@ -17,6 +17,9 @@ const
     WORLD_DIR   = "/var/forge/world"
     REPO_DIR    = "/var/forge/repo"
     LOCK_PATH   = TEMP_DIR / "forge.lock"
+    FIND_DIRS = @["/bin", "/sbin", "/usr/bin", "/usr/sbin", "/usr/include",
+                   "/usr/share", "/usr/lib", "/usr/lib64", "/usr/local/bin",
+                   "/usr/local/lib", "/etc", "/lib", "/lib64", "/var/forge/glibc_compat"]
 
 let PKG_RE = re("^[a-zA-Z0-9][a-zA0-9._-]*$")
 
@@ -80,9 +83,7 @@ proc install(name: string) =
     consoleInfo("Building package.")
     consoleDimSep()
 
-    let timeMarker = TEMP_DIR / (name & "_marker")
-    sleep(1000)
-    discard execCmd("touch " & timeMarker)
+    let markerTime = getTime()
     sleep(1000)
     let buildsh = readFile(fmt"{TEMP_DIR}/{name}/build.sh")
     echo buildsh
@@ -93,13 +94,24 @@ proc install(name: string) =
         consoleFail("Build failed.")
         programExit("Build error")
 
-    let dirs = "/bin /sbin /usr/bin /usr/sbin /usr/include /usr/share /usr/lib /usr/lib64 /usr/local/bin /usr/local/lib /etc /lib /lib64 /var/forge/glibc-compat"
     let installLog = fmt"/var/forge/world/{name}_installed"
     consoleInfo("Tracking installed files...")
-    discard execCmd(fmt"find {dirs} -newer {timeMarker} ! -type d 2>/dev/null > {installLog}")
+
+    var logFile = open(installLog, fmWrite)
+    try:
+      for dir in FIND_DIRS:
+          if dirExists(dir):
+              for path in walkDirRec(dir, yieldFilter={pcFile, pcLinkToFile}):
+                  try:
+                      if getLastModificationTime(path) > markerTime:
+                          logFile.writeLine(path)
+                  except OSError:
+                      discard
+    finally:
+      logFile.close()
+
     writeFile(fmt"/var/forge/world/{name}", "")
-    removeFile(timeMarker)
-    consoleOkay(fmt"{name} has been installed succesfully.")
+    consoleOkay(fmt"{name} has been installed successfully.")
     removeDir(workDir)
 
 proc list() =
