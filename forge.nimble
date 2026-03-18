@@ -9,6 +9,8 @@ namedBin["main"] = "forge"
 requires "nim >= 2.0.8"
 requires "zippy >= 0.10.19"
 requires "regex >= 0.26.3"
+requires "parsetoml >= 0.7.0"
+requires "nimcrypto >= 0.5.4"
 
 import std/strformat
 
