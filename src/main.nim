@@ -37,7 +37,7 @@ if OPERATION notin ["install", "remove", "list", "info"]:
 
 let PKGS = if paramCount() > 1: CMDLINE[1..^1] else: @[]
 
-let FIND_DIRS = ["/bin", "/sbin", "/usr/bin", "/usr/sbin", "/usr/local/bin", "/usr/lib", "/usr/local/lib", "/etc", "/usr/share", "/usr/include", "lib", "lib64", "/usr/libexec", "/usr/src"]
+let FIND_DIRS = ["/bin", "/sbin", "/usr/bin", "/usr/sbin", "/usr/local/bin", "/usr/lib", "/usr/local/lib", "/usr/share", "/usr/include", "lib", "lib64", "/usr/libexec", "/usr/src"]
 
 createDir(WORLD_DIR)
 
