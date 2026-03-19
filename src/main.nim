@@ -176,9 +176,22 @@ proc remove(name: string) =
     removeFile(fmt"/var/forge/world/{name}_installed")
     removeFile(fmt"/var/forge/world/{name}")
     consoleOkay(fmt"{name} has been removed.")
-
+proc loadBuildConf() =
+    let confPath = "/etc/forge/build.conf"
+    if fileExists(confPath) :
+        consoleInfo("Loading global build config..")
+        for line in lines(confPath):
+            let l = line.strip()
+            if l.len == 0 or l.startsWith("#"): continue
+            let parts = l.split('=',1)
+            if parts.len == 2:
+                let key = parts[0].strip()
+                let val = parts[1].strip().strip(chars = {'"', '\''})
+                putEnv(key, val)
+                consoleDebug(fmt" -> {key} set to: {val}")
 case OPERATION
 of "install":
+  loadBuildConf()
   withLock(LOCK_PATH):
     for pkg in PKGS:
       install(pkg)
