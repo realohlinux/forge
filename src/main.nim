@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: BSD-3-Clause
-# Copyright (C) 2025-2026 Taylor (Wakana Kisarazu), okla14
+# Copyright (C) 2025-2026 Taylor (Wakana Kisarazu), okla14, sgfreak
 
 import std/[posix, os, osproc, strformat, strutils, httpclient, re, times]
 import zippy/tarballs
@@ -44,14 +44,6 @@ proc install(name: string) =
 
     let workdir = TEMP_DIR / name
     let pkgsrc = fmt"{TEMP_DIR}/{name}.tar.gz"
-    proc cleanUp() =
-        consoleInfo("Cleaning up")
-        if dirExists(workdir):
-            removeDir(workdir)
-        if fileExists(pkgsrc):
-            removeFile(pkgsrc)
-        if fileExists(LOCK_PATH):
-            removeFile(LOCK_PATH)
 
     let client = newHttpClient()
     client.downloadFile(fmt"{REPO_DATA}/{name}.tar.gz", pkgsrc)
@@ -79,14 +71,24 @@ proc install(name: string) =
               install(i)
             except Exception as e:
               consoleFail(fmt"Failed to install dependency {i}: {e.msg}")
-              cleanUp()
 
               programExit("Dependency error")
     else:
       consoleInfo("No dependencies found.")
 
     consoleDimSep()
+    stdout.write(fmt"Do you want to edit the build script for {name}? [y/N]: ")
+    stdout.flushFile()
 
+    let answer = try: stdin.readLine().toLowerAscii() except: "n"
+    if answer in ["y", "yes", "ye", "yea", "yy"]:
+        let editor = getEnv("EDITOR", "busybox vi")
+        let buildPath = fmt"{workdir}/build.sh"
+        if fileExists(buildPath):
+            consoleInfo(fmt"Editing {buildPath} with {editor}..")
+            discard execCmd(fmt"{editor} {buildPath}")
+        else:
+            consoleWarn("build.sh script not found, are you sure this is a forge package?")
     consoleInfo("Building package.")
     consoleDimSep()
 
@@ -98,7 +100,6 @@ proc install(name: string) =
     consoleDimSep()
 
     if execCmd(fmt"cd {TEMP_DIR}/{name} && sh build.sh") != 0:
-        cleanUp()
         consoleFail("Build failed.")
         programExit("Build error")
 
@@ -120,7 +121,7 @@ proc install(name: string) =
 
     writeFile(fmt"/var/forge/world/{name}", "")
     consoleOkay(fmt"{name} has been installed successfully.")
-    cleanUp()
+    
 
 proc list() =
     var count = 0
@@ -175,12 +176,26 @@ proc remove(name: string) =
     removeFile(fmt"/var/forge/world/{name}_installed")
     removeFile(fmt"/var/forge/world/{name}")
     consoleOkay(fmt"{name} has been removed.")
-
+proc loadBuildConf() =
+    let confPath = "/etc/forge/build.conf"
+    if fileExists(confPath) :
+        consoleInfo("Loading global build config..")
+        for line in lines(confPath):
+            let l = line.strip()
+            if l.len == 0 or l.startsWith("#"): continue
+            let parts = l.split('=',1)
+            if parts.len == 2:
+                let key = parts[0].strip()
+                let val = parts[1].strip().strip(chars = {'"', '\''})
+                putEnv(key, val)
+                consoleDebug(fmt" -> {key} set to: {val}")
 case OPERATION
 of "install":
+  loadBuildConf()
   withLock(LOCK_PATH):
     for pkg in PKGS:
       install(pkg)
+      removeDir(fmt"{TEMP_DIR}")
 of "remove":
   withLock(LOCK_PATH):
     for pkg in PKGS:
