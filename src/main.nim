@@ -27,7 +27,7 @@ let
     OPERATION   = CMDLINE[0]
 
 
-if OPERATION notin ["install", "remove", "list", "info"]:
+if OPERATION notin ["install", "remove", "list", "info", "fabric"]:
     programExit(fmt"Operation not supported: {OPERATION}")
     printUsage()
 
@@ -189,6 +189,32 @@ proc loadBuildConf() =
                 let val = parts[1].strip().strip(chars = {'"', '\''})
                 putEnv(key, val)
                 consoleDebug(fmt" -> {key} set to: {val}")
+proc fabric(path: string) =
+    if not fileExists(path):
+        consoleFail(fmt"File not found: {path}")
+        return
+    let fileName = extractFilename(path)
+    let name = fileName.replace(".tar.gz", "").replace(".tgz", "")
+    let workdir = TEMP_DIR / name
+    consoleInfo(fmt"Building local package: {name}")
+    if dirExists(workdir):
+        removeDir(workdir)
+    try:
+        extractAll(path, workdir)
+        consoleOkay("Extract sucess.")
+    except Exception as e:
+        consoleFail(fmt"Error extracting the tarball: {e.msg}")
+        return
+    consoleDimSep()
+    consoleInfo("Building local package.")
+    let markerTime = getTime()
+    let buildsh = workdir / "build.sh"
+    if not fileExists(buildsh):
+        consoleFail("Build script not found in local package")
+        return
+    if execCmd(fmt"cd {workdir} && sh build.sh") != 0:
+        consoleFail("Local build failed.")
+        return
 case OPERATION
 of "install":
   loadBuildConf()
@@ -205,6 +231,11 @@ of "list":
 of "info":
   for pkg in PKGS:
     info(pkg)
+of "fabric":
+  for path in PKGS:
+      fabric(path)
+      let name = extractFilename(path).replace(".tar.gz", "").replace(".tgz", "")
+      removeDir(TEMP_DIR / name)
 else:
     programExit("Operation not supported: {OPERATION}")
     printUsage()
