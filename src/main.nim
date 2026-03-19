@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: BSD-3-Clause
-# Copyright (C) 2025-2026 Taylor (Wakana Kisarazu), okla14
+# Copyright (C) 2025-2026 Taylor (Wakana Kisarazu), okla14, sgfreak
 
 import std/[posix, os, osproc, strformat, strutils, httpclient, re, times]
 import zippy/tarballs
